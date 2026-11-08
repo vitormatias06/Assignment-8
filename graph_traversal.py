@@ -1,3 +1,4 @@
+
 """
 Graph traversal algorithms: BFS and DFS implementations.
 Includes testing and benchmarking utilities for social network analysis.
@@ -7,6 +8,7 @@ import json
 import time
 import random
 import sys
+import tracemalloc
 from pathlib import Path
 from collections import deque
 
@@ -17,28 +19,44 @@ from collections import deque
 def bfs(graph, start, target):
     """
     Find shortest path between two users using breadth-first search.
-    
+
     Args:
         graph: Dictionary where graph[user_id] = list of friend IDs
         start: Starting user ID
         target: Target user ID
-        
+
     Returns:
         List representing shortest path from start to target,
-        or empty list if no path exists
-        
-    Example:
-        graph = {0: [1, 2], 1: [0, 3], 2: [0], 3: [1]}
-        bfs(graph, 0, 3) returns [0, 1, 3]
+        or empty list if no path exists.
     """
-    # TODO: Implement BFS
-    # Hints:
-    # - Use a queue (deque) to track nodes to visit
-    # - Track visited nodes to avoid cycles
-    # - Track parent pointers to reconstruct path
-    # - Return path from start to target as a list
-    
-    pass
+
+    if start not in graph or target not in graph:
+        return []
+
+    queue = deque([start])
+    visited = {start}
+    parents = {start: None}
+
+    while queue:
+        current = queue.popleft()
+
+        if current == target:
+            path = []
+            node = target
+
+            while node is not None:
+                path.append(node)
+                node = parents[node]
+
+            return path[::-1]
+
+        for neighbor in graph.get(current, []):
+            if neighbor not in visited:
+                visited.add(neighbor)
+                parents[neighbor] = current
+                queue.append(neighbor)
+
+    return []
 
 
 # ============================================================================
@@ -48,25 +66,32 @@ def bfs(graph, start, target):
 def dfs(graph, start):
     """
     Find all users reachable from a starting user using depth-first search.
-    
+
     Args:
         graph: Dictionary where graph[user_id] = list of friend IDs
         start: Starting user ID
-        
+
     Returns:
-        Set of all user IDs reachable from start (including start itself)
-        
-    Example:
-        graph = {0: [1, 2], 1: [0, 3], 2: [0], 3: [1], 4: [5], 5: [4]}
-        dfs(graph, 0) returns {0, 1, 2, 3}
+        Set of all user IDs reachable from start.
     """
-    # TODO: Implement DFS
-    # Hints:
-    # - Use recursion or a stack to explore deeply
-    # - Track visited nodes to avoid infinite loops
-    # - Return a set of all reachable user IDs
-    
-    pass
+
+    if start not in graph:
+        return set()
+
+    visited = set()
+    stack = [start]
+
+    while stack:
+        current = stack.pop()
+
+        if current not in visited:
+            visited.add(current)
+
+            for neighbor in graph.get(current, []):
+                if neighbor not in visited:
+                    stack.append(neighbor)
+
+    return visited
 
 
 # ============================================================================
@@ -75,139 +100,242 @@ def dfs(graph, start):
 
 def load_network(size):
     """Load social network dataset of given size."""
+
     filename = f'data/network_{size}.json'
+
     if not Path(filename).exists():
         print(f"Error: {filename} not found. Run network_generator.py first.")
         sys.exit(1)
-    
+
     with open(filename, 'r') as f:
         data = json.load(f)
-    
-    # Convert graph to simple adjacency list (remove metadata)
+
     graph = {int(k): v for k, v in data['graph'].items()}
+
     return graph, data['num_users']
+
+
+# ============================================================================
+# BFS TEST
+# ============================================================================
 
 def test_bfs():
     """Test BFS implementation on small network with known paths."""
-    print("\n" + "="*70)
+
+    print("\n" + "=" * 70)
     print("TESTING: Breadth-First Search (BFS)")
-    print("="*70)
-    
-    # Load smallest network
+    print("=" * 70)
+
     graph, num_users = load_network(100)
-    
-    # Test multiple random paths
+
     test_cases = 5
+
     print(f"\nTesting {test_cases} random paths in 100-user network...\n")
-    
+
     for i in range(test_cases):
+
         start = random.randint(0, num_users - 1)
         target = random.randint(0, num_users - 1)
-        
+
         path = bfs(graph, start, target)
-        
+
         if path:
             print(f"Test {i+1}: Path from User {start} to User {target}")
             print(f"  Length: {len(path) - 1} connections")
-            print(f"  Path: {' → '.join(map(str, path[:5]))}{'...' if len(path) > 5 else ''}")
-            
-            # Verify path is valid
+
+            print(
+                f"  Path: {' → '.join(map(str, path[:5]))}"
+                f"{'...' if len(path) > 5 else ''}"
+            )
+
             valid = True
+
             for j in range(len(path) - 1):
-                if path[j+1] not in graph[path[j]]:
+                if path[j+1] not in graph.get(path[j], []):
                     valid = False
                     break
-            
+
             status = "✓ Valid" if valid else "✗ Invalid"
+
             print(f"  Status: {status}\n")
+
         else:
-            print(f"Test {i+1}: No path from User {start} to User {target}\n")
+            print(
+                f"Test {i+1}: No path from User {start} "
+                f"to User {target}\n"
+            )
+
+
+# ============================================================================
+# DFS TEST
+# ============================================================================
 
 def test_dfs():
     """Test DFS implementation on small network."""
-    print("\n" + "="*70)
+
+    print("\n" + "=" * 70)
     print("TESTING: Depth-First Search (DFS)")
-    print("="*70)
-    
-    # Load smallest network
+    print("=" * 70)
+
     graph, num_users = load_network(100)
-    
-    # Test from multiple starting points
+
     test_cases = 5
+
     print(f"\nTesting {test_cases} explorations in 100-user network...\n")
-    
+
     for i in range(test_cases):
+
         start = random.randint(0, num_users - 1)
-        
+
         reachable = dfs(graph, start)
-        
+
         print(f"Test {i+1}: Exploration from User {start}")
         print(f"  Reachable users: {len(reachable)}")
-        print(f"  Percentage of network: {(len(reachable)/num_users)*100:.1f}%")
-        
-        # Verify start is in reachable set
+
+        percentage = (len(reachable) / num_users) * 100
+
+        print(f"  Percentage of network: {percentage:.1f}%")
+
         if start in reachable:
-            print(f"  Status: ✓ Valid (includes start node)\n")
+            print("  Status: ✓ Valid (includes start node)\n")
         else:
-            print(f"  Status: ✗ Invalid (missing start node)\n")
+            print("  Status: ✗ Invalid (missing start node)\n")
+
+
+# ============================================================================
+# BENCHMARK BFS
+# ============================================================================
 
 def benchmark_bfs(graph, num_users, num_trials=10):
-    """Benchmark BFS performance."""
+    """Benchmark BFS execution time and memory usage."""
+
     total_time = 0
-    
+    total_memory = 0
+
     for _ in range(num_trials):
+
         start = random.randint(0, num_users - 1)
         target = random.randint(0, num_users - 1)
-        
-        start_time = time.time()
+
+        tracemalloc.start()
+
+        start_time = time.perf_counter()
+
         bfs(graph, start, target)
-        total_time += time.time() - start_time
-    
-    return total_time / num_trials
+
+        elapsed_time = time.perf_counter() - start_time
+
+        _, peak_memory = tracemalloc.get_traced_memory()
+
+        tracemalloc.stop()
+
+        total_time += elapsed_time
+        total_memory += peak_memory
+
+    average_time = total_time / num_trials
+    average_memory = total_memory / num_trials
+
+    return average_time, average_memory
+
+
+# ============================================================================
+# BENCHMARK DFS
+# ============================================================================
 
 def benchmark_dfs(graph, num_users, num_trials=10):
-    """Benchmark DFS performance."""
+    """Benchmark DFS execution time and memory usage."""
+
     total_time = 0
-    
+    total_memory = 0
+
     for _ in range(num_trials):
+
         start = random.randint(0, num_users - 1)
-        
-        start_time = time.time()
+
+        tracemalloc.start()
+
+        start_time = time.perf_counter()
+
         dfs(graph, start)
-        total_time += time.time() - start_time
-    
-    return total_time / num_trials
+
+        elapsed_time = time.perf_counter() - start_time
+
+        _, peak_memory = tracemalloc.get_traced_memory()
+
+        tracemalloc.stop()
+
+        total_time += elapsed_time
+        total_memory += peak_memory
+
+    average_time = total_time / num_trials
+    average_memory = total_memory / num_trials
+
+    return average_time, average_memory
+
+
+# ============================================================================
+# RUN BENCHMARKS
+# ============================================================================
 
 def run_benchmarks():
     """Compare BFS and DFS performance across different network sizes."""
-    print("\n" + "="*70)
+
+    print("\n" + "=" * 80)
     print("BENCHMARKING: BFS vs DFS Performance")
-    print("="*70)
-    print("\nRunning 10 trials per algorithm on each network size...")
-    
+    print("=" * 80)
+
+    print("\nRunning 10 trials per algorithm on each network size...\n")
+
     sizes = [100, 500, 1000]
-    
-    print(f"\n{'Size':<8} {'Algorithm':<12} {'Avg Time (ms)':<15} {'Operations'}")
-    print("-" * 70)
-    
+
+    print(
+        f"{'Size':<10}"
+        f"{'Algorithm':<12}"
+        f"{'Avg Time (ms)':<18}"
+        f"{'Peak Memory (KB)':<18}"
+        f"{'Operations'}"
+    )
+
+    print("-" * 80)
+
     for size in sizes:
+
         graph, num_users = load_network(size)
-        
-        # Benchmark BFS
-        bfs_time = benchmark_bfs(graph, num_users)
-        bfs_ops = f"~{num_users + sum(len(friends) for friends in graph.values())}"
-        print(f"{size:<8} {'BFS':<12} {bfs_time*1000:<15.3f} {bfs_ops}")
-        
-        # Benchmark DFS
-        dfs_time = benchmark_dfs(graph, num_users)
-        dfs_ops = f"~{num_users + sum(len(friends) for friends in graph.values())}"
-        print(f"{size:<8} {'DFS':<12} {dfs_time*1000:<15.3f} {dfs_ops}")
+
+        operations = num_users + sum(
+            len(friends) for friends in graph.values()
+        )
+
+        # BFS benchmark
+        bfs_time, bfs_memory = benchmark_bfs(graph, num_users)
+
+        print(
+            f"{size:<10}"
+            f"{'BFS':<12}"
+            f"{bfs_time * 1000:<18.3f}"
+            f"{bfs_memory / 1024:<18.2f}"
+            f"~{operations}"
+        )
+
+        # DFS benchmark
+        dfs_time, dfs_memory = benchmark_dfs(graph, num_users)
+
+        print(
+            f"{size:<10}"
+            f"{'DFS':<12}"
+            f"{dfs_time * 1000:<18.3f}"
+            f"{dfs_memory / 1024:<18.2f}"
+            f"~{operations}"
+        )
+
         print()
-    
-    print("="*70)
+
+    print("=" * 80)
     print("Note: Both algorithms have O(V + E) time complexity.")
-    print("Performance differences come from implementation details and graph structure.")
-    print("="*70)
+    print("Memory measurements represent approximate peak memory")
+    print("used by each algorithm during execution.")
+    print("=" * 80)
+
 
 # ============================================================================
 # MAIN INTERFACE
@@ -215,43 +343,53 @@ def run_benchmarks():
 
 def print_usage():
     """Print usage instructions."""
+
     print("\nUsage: python graph_traversal.py [option]")
+
     print("\nOptions:")
     print("  --test-bfs      Test BFS implementation on small network")
     print("  --test-dfs      Test DFS implementation on small network")
     print("  --benchmark     Compare BFS and DFS performance")
     print("  --help          Show this help message")
+
     print("\nFor the assignment, run these commands in order:")
+
     print("  1. python graph_traversal.py --test-bfs")
     print("  2. python graph_traversal.py --test-dfs")
     print("  3. python graph_traversal.py --benchmark")
 
+
 def main():
     """Main entry point for running tests and benchmarks."""
+
     if len(sys.argv) < 2:
         print_usage()
         return
-    
+
     option = sys.argv[1]
-    
-    # Check if data files exist
+
     if not Path('data/network_100.json').exists():
         print("\nError: Data files not found!")
         print("Please run: python network_generator.py")
         print("This will create the required test datasets.")
         sys.exit(1)
-    
+
     if option == '--test-bfs':
         test_bfs()
+
     elif option == '--test-dfs':
         test_dfs()
+
     elif option == '--benchmark':
         run_benchmarks()
+
     elif option == '--help':
         print_usage()
+
     else:
         print(f"\nError: Unknown option '{option}'")
         print_usage()
+
 
 if __name__ == '__main__':
     main()
